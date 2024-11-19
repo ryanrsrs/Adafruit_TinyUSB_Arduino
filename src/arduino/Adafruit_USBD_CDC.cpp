@@ -42,7 +42,10 @@
 Adafruit_USBD_CDC SerialTinyUSB;
 
 uint8_t Adafruit_USBD_CDC::_instance_count = 0;
-Adafruit_USBD_CDC::Adafruit_USBD_CDC(void) { _instance = INVALID_INSTANCE; }
+Adafruit_USBD_CDC::Adafruit_USBD_CDC(void) {
+  _instance = INVALID_INSTANCE;
+  mux_newline = true;
+}
 
 #if CFG_TUD_ENABLED
 
@@ -235,7 +238,7 @@ void Adafruit_USBD_CDC::flush(void) {
 
 size_t Adafruit_USBD_CDC::write(uint8_t ch) { return write(&ch, 1); }
 
-size_t Adafruit_USBD_CDC::write(const uint8_t *buffer, size_t size) {
+size_t Adafruit_USBD_CDC::write_raw(const uint8_t *buffer, size_t size) {
   if (!isValid()) {
     return 0;
   }
@@ -250,6 +253,55 @@ size_t Adafruit_USBD_CDC::write(const uint8_t *buffer, size_t size) {
     if (remain) {
       yield();
     }
+  }
+
+  return size - remain;
+}
+
+void Adafruit_USBD_CDC::set_mux_token(const char* token) {
+  if (token == 0) new_token[0] = 0;
+  else snprintf(new_token, sizeof(new_token), "%s|", token);
+  use_new_token = true;
+}
+
+size_t Adafruit_USBD_CDC::write(const uint8_t *buffer, size_t size) {
+  if (!isValid() || size == 0) {
+    return 0;
+  }
+
+  if (use_new_token) {
+    // mux token was changed since the last print
+
+    // make sure it's really a different token string (could have
+    // been changed, then changed back without an intervening print)
+    if (strncmp(new_token, mux_token, sizeof(mux_token))) {
+      if (!mux_newline) {
+        // previous print didn't end with a newline, so
+        // force a newline before changing the mux token.
+        write_raw((const uint8_t*)"\n", 1);
+        mux_newline = true;
+      }
+      strlcpy(mux_token, new_token, sizeof(mux_token));
+      mux_token_len = strlen(mux_token);
+    }
+    use_new_token = false;
+  }
+
+  size_t remain = size;
+  while (remain && tud_cdc_n_connected(_instance)) {
+    if (mux_newline) {
+        // start of new line, so write out token first
+        if (mux_token_len) write_raw((const uint8_t*)mux_token, mux_token_len);
+        mux_newline = false;
+    }
+    // print only up to next newline. after the newline we'll need to print
+    // the token again.
+    const uint8_t* nl = (const uint8_t*) memchr(buffer, '\n', remain);
+    size_t chunk = nl ? nl - buffer + 1 : remain; // output includes the '\n'
+    size_t wrcount = write_raw(buffer, chunk);
+    if (nl && wrcount == chunk) mux_newline = true;
+    remain -= wrcount;
+    buffer += wrcount;
   }
 
   return size - remain;

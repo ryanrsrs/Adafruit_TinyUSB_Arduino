@@ -75,6 +75,8 @@ public:
     return write((const uint8_t *)buffer, size);
   }
 
+  void set_mux_token(const char* token);
+
   virtual int availableForWrite(void);
   using Print::write; // pull in write(str) from Print
   operator bool();
@@ -90,6 +92,15 @@ private:
   uint8_t _instance;
 
   bool isValid(void) { return _instance != INVALID_INSTANCE; }
+
+  char mux_token[32];
+  size_t mux_token_len;
+  bool mux_newline;
+
+  char new_token[32];
+  bool use_new_token;
+
+  size_t write_raw(const uint8_t *buffer, size_t size);
 };
 
 // "Serial" is used with TinyUSB CDC
