@@ -259,9 +259,13 @@ size_t Adafruit_USBD_CDC::write_raw(const uint8_t *buffer, size_t size) {
 }
 
 void Adafruit_USBD_CDC::set_mux_token(const char* token) {
-  if (token == 0) new_token[0] = 0;
-  else snprintf(new_token, sizeof(new_token), "%s|", token);
+  if (token == 0) token = "";
+  strlcpy(new_token, token, sizeof(new_token));
   use_new_token = true;
+}
+
+const char* Adafruit_USBD_CDC::get_mux_token() {
+  return new_token;
 }
 
 size_t Adafruit_USBD_CDC::write(const uint8_t *buffer, size_t size) {
@@ -274,14 +278,18 @@ size_t Adafruit_USBD_CDC::write(const uint8_t *buffer, size_t size) {
 
     // make sure it's really a different token string (could have
     // been changed, then changed back without an intervening print)
-    if (strncmp(new_token, mux_token, sizeof(mux_token))) {
+    size_t new_token_len = strlen(new_token);
+    // mux_token has trailing '|', new_token does not
+    if (mux_token_len != new_token_len + 1 || strncmp(new_token, mux_token, new_token_len)) {
       if (!mux_newline) {
         // previous print didn't end with a newline, so
         // force a newline before changing the mux token.
         write_raw((const uint8_t*)"\n", 1);
         mux_newline = true;
       }
-      strlcpy(mux_token, new_token, sizeof(mux_token));
+      // add the trailing '|'
+      if (new_token_len == 0) mux_token[0] = 0;
+      else snprintf(mux_token, sizeof(mux_token), "%s|", new_token);
       mux_token_len = strlen(mux_token);
     }
     use_new_token = false;
