@@ -77,6 +77,7 @@ public:
   }
 
   void set_mux_token(const char* token);
+  const char* get_mux_token();
 
   virtual int availableForWrite(void);
   using Print::write; // pull in write(str) from Print
