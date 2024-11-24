@@ -94,11 +94,11 @@ private:
 
   bool isValid(void) { return _instance != INVALID_INSTANCE; }
 
-  char mux_token[32];
+  char mux_token[52];
   size_t mux_token_len;
   bool mux_newline;
 
-  char new_token[32];
+  char new_token[50];
   bool use_new_token;
 
   size_t write_raw(const uint8_t *buffer, size_t size);
